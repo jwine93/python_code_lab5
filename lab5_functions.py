@@ -7,6 +7,7 @@ import os, sys
 import rasterio
 import geopandas as gpd
 import numpy as np
+from rasterstats import zonal_stats
 
 
 
@@ -104,6 +105,7 @@ class SmartRaster:
 
 
 
+
 ##################
 # Block 4: 
 #   Set up a new smart vector class using geopandas
@@ -111,3 +113,111 @@ class SmartRaster:
 #    to calculate the zonal statistics for a raster
 #    and add them as a column to the attribute table of the vector
 
+
+import geopandas as gpd
+from rasterstats import zonal_stats
+import os
+
+class SmartVector:
+    def __init__(self, vector_path):
+        """
+        Initialize the SmartVector class with a vector file path.
+        """
+        self.vector_path = vector_path
+        self.gdf = None  # Initialize the GeoDataFrame attribute
+
+        # Load the vector file
+        try:
+            self.gdf = gpd.read_file(self.vector_path)
+            print(f"Loaded vector file: {self.vector_path}")
+        except Exception as e:
+            raise ValueError(f"Error loading vector file: {e}")
+        
+        
+    def summarize_field(self, field):
+        """Calculate the mean value of a specified field"""
+        # Set up a tracking variable to track if things work
+        okay = True
+        
+        # Check if the field is in the dataset
+        try:
+            if field not in self.gdf.columns:
+                okay = False
+                print(f"The field {field} is not in list of possible fields")
+                return False, None
+        except Exception as e:
+            print(f"Problem checking the fields: {e}")
+            okay = False
+            return False, None
+        
+        # Calculate the mean value
+        try:
+            # Filter out None and NaN values
+            valid_values = self.gdf[field].dropna()
+            mean = valid_values.mean()
+            return okay, mean
+        except Exception as e:
+            print(f"Problem calculating mean: {e}")
+            okay = False
+            return False, None
+        
+
+    def zonal_stats_to_field(self, raster_path, statistic_type="mean", output_field="zonal_stat"):
+        """
+        For each feature in the vector layer, calculates the zonal statistic from the raster
+        and writes it to a new field.
+
+        Parameters:
+        - raster_path: Path to the raster file.
+        - statistic_type: Type of statistic to calculate (e.g., 'mean', 'sum', 'min', 'max').
+        - output_field: Name of the column to store the results.
+
+        Returns:
+        - Updated GeoDataFrame with the new column.
+        """
+        # Set up a tracking variable to track if things work
+        okay = True
+
+        # Check if the raster file exists
+        if not os.path.exists(raster_path):
+            print(f"Raster file not found: {raster_path}")
+            return False
+
+        # Add a field to store the zonal stats result
+        if output_field in self.gdf.columns:
+            print(f"Field '{output_field}' already exists. Will overwrite values.")
+        else:
+            print(f"Adding field '{output_field}' to store zonal statistics.")
+
+        # Calculate zonal statistics
+        try:
+            print("Starting zonal statistics calculation...")
+            stats = zonal_stats(self.gdf, raster_path, stats=statistic_type, geojson_out=False)
+            print(f"Calculated zonal statistics for {raster_path}")
+        except Exception as e:
+            print(f"Error calculating zonal statistics: {e}")
+            return False
+
+        # Add the statistics to the GeoDataFrame
+        try:
+            self.gdf[output_field] = [s[statistic_type] for s in stats]
+            print(f"Zonal statistics '{statistic_type}' added to field '{output_field}'.")
+        except Exception as e:
+            print(f"Error adding zonal statistics to GeoDataFrame: {e}")
+            okay = False
+            return okay
+
+        return okay
+
+    def save_as(self, output_path):
+        """
+        Save the updated GeoDataFrame to a new file.
+
+        Parameters:
+        - output_path: Path to save the updated vector file.
+        """
+        try:
+            self.gdf.to_file(output_path)
+            print(f"Saved updated vector file to {output_path}.")
+        except Exception as e:
+            raise ValueError(f"Error saving vector file: {e}")
