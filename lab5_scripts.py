@@ -44,8 +44,8 @@ output_file = r"R:\2025\Spring\GEOG562\Students\wineju\Lab5_2025\outputs\updated
 vector = l5.SmartVector(parcels_file)
 
 # Calculate zonal statistics and add them to the attribute table
-vector.zonal_stats_to_field(landsat_file, statistic_type="mean", output_field="mean_ndvi"):
-    # Save the updated vector file
+vector.zonal_stats_to_field(landsat_file, statistic_type="mean", output_field="mean_ndvi")
+# Save the updated vector file
 vector.save_as(output_file)
 
 #  Part 3: Optional
